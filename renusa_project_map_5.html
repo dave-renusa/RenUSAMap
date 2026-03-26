@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RenUSA Project Map | 2026 Roster</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --solar: #F59E0B;
+    --solar-bg: rgba(245,158,11,0.12);
+    --wind: #3B82F6;
+    --wind-bg: rgba(59,130,246,0.12);
+    --bess: #10B981;
+    --bess-bg: rgba(16,185,129,0.12);
+    --transmission: #F97316;
+    --transmission-bg: rgba(249,115,22,0.12);
+    --datacenter: #EF4444;
+    --datacenter-bg: rgba(239,68,68,0.12);
+    --hydrogen: #8B5CF6;
+    --hydrogen-bg: rgba(139,92,246,0.12);
+    --multi: #EC4899;
+    --multi-bg: rgba(236,72,153,0.12);
+    --panel-bg: #ffffff;
+    --panel-surface: #f5f6f8;
+    --panel-border: rgba(0,0,0,0.08);
+    --text-primary: #1a1d27;
+    --text-secondary: #5c6078;
+    --text-muted: #8b8fa3;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #f0f1f3;
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  #map {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 1;
+  }
+
+  /* Map tiles */
+  .leaflet-control-zoom { display: none; }
+
+  /* Panel overlay */
+  .panel {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 1000;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 20px;
+    width: 300px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.04) inset;
+    backdrop-filter: blur(20px);
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .panel-logo {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--solar), var(--wind));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    color: white;
+    letter-spacing: -0.5px;
+  }
+
+  .panel-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .panel-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+    width: 100%;
+  }
+
+  .filter-btn:hover {
+    background: rgba(0,0,0,0.04);
+  }
+
+  .filter-btn.active {
+    background: var(--active-bg);
+  }
+
+  .filter-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .filter-btn.inactive .filter-icon {
+    opacity: 0.3;
+  }
+  .filter-btn.inactive .filter-label {
+    opacity: 0.35;
+  }
+  .filter-btn.inactive .filter-count {
+    opacity: 0.25;
+  }
+
+  .filter-label { flex: 1; }
+
+  .filter-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-width: 22px;
+    text-align: right;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--panel-border);
+    margin: 12px 0;
+  }
+
+  .stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .stats-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stats-value {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .state-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Custom marker styling */
+  .custom-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    transition: transform 0.15s ease;
+    cursor: pointer;
+  }
+  .custom-marker:hover {
+    transform: scale(1.3);
+    z-index: 9999 !important;
+  }
+
+  /* Popup styling */
+  .leaflet-popup-content-wrapper {
+    background: var(--panel-bg) !important;
+    border: 1px solid var(--panel-border) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12) !important;
+    color: var(--text-primary) !important;
+    padding: 0 !important;
+  }
+  .leaflet-popup-content {
+    margin: 0 !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+  }
+  .leaflet-popup-tip {
+    background: var(--panel-bg) !important;
+    border: 1px solid rgba(0,0,0,0.08) !important;
+  }
+  .leaflet-popup-close-button {
+    color: var(--text-secondary) !important;
+    font-size: 18px !important;
+    padding: 6px 8px !important;
+  }
+
+  .popup-inner {
+    padding: 14px 16px;
+  }
+  .popup-type {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .popup-location {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  /* Leaflet attribution */
+  .leaflet-control-attribution {
+    background: rgba(255,255,255,0.85) !important;
+    color: var(--text-muted) !important;
+    font-size: 10px !important;
+    border-radius: 4px 0 0 0 !important;
+  }
+  .leaflet-control-attribution a { color: var(--text-secondary) !important; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .panel {
+      top: auto;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      border-radius: 18px 18px 0 0;
+      padding: 16px;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+    .filter-group { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+    .filter-btn { width: auto; flex: 1; min-width: 120px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="panel">
+  <div class="panel-header">
+    <div class="panel-logo">R</div>
+    <div class="panel-title">RenUSA</div>
+  </div>
+  <div class="panel-subtitle">2026 Project Roster</div>
+
+  <div class="stats-row">
+    <span class="stats-label">Active Projects</span>
+    <span class="stats-value" id="totalCount">68</span>
+  </div>
+  <div class="stats-row" style="margin-bottom: 4px;">
+    <span class="stats-label">States</span>
+    <span class="state-count" id="stateCount"></span>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="filter-group" id="filters"></div>
+</div>
+
+<script>
+const PROJECTS = [
+  {type:"Solar",location:"Union County, PA",lat:40.96,lng:-77.06},
+  {type:"Solar",location:"Mercer County, PA",lat:41.30,lng:-80.25},
+  {type:"Solar",location:"Montour & Columbia Co., PA",lat:41.03,lng:-76.65},
+  {type:"Solar",location:"Bedford County, PA",lat:40.01,lng:-78.49},
+  {type:"Wind",location:"Lafayette/Iowa/Grant Co, WI",lat:42.66,lng:-90.13},
+  {type:"Solar",location:"St. Landry Parish, LA",lat:30.60,lng:-92.00},
+  {type:"Solar",location:"Acadia Parish, LA",lat:30.29,lng:-92.41},
+  {type:"Solar",location:"Jefferson Davis Parish, LA",lat:30.27,lng:-92.81},
+  {type:"Solar",location:"Ouachita Parish, LA",lat:32.48,lng:-92.16},
+  {type:"Solar",location:"Jefferson Davis/Calcasieu, LA",lat:30.22,lng:-93.05},
+  {type:"Solar",location:"Assumption Parish, LA",lat:29.90,lng:-91.06},
+  {type:"Solar",location:"Assumption Parish, LA",lat:29.92,lng:-91.10},
+  {type:"Solar",location:"East Carroll Parish, LA",lat:32.73,lng:-91.24},
+  {type:"Solar",location:"Franklin Parish, LA",lat:32.13,lng:-91.67},
+  {type:"Solar",location:"Franklin Parish, LA",lat:32.15,lng:-91.63},
+  {type:"Solar",location:"Franklin Parish, LA",lat:32.11,lng:-91.70},
+  {type:"Transmission",location:"TX/LA/MS Corridor",lat:31.50,lng:-92.50},
+  {type:"Transmission",location:"NM/AZ Corridor",lat:33.50,lng:-109.00},
+  {type:"Solar",location:"Pinal County, AZ",lat:32.75,lng:-111.40},
+  {type:"Solar & Wind",location:"Washington County, IL",lat:38.35,lng:-89.41},
+  {type:"Solar & Wind",location:"St. Clair County, IL",lat:38.47,lng:-89.93},
+  {type:"Solar & Wind",location:"Randolph County, IL",lat:38.06,lng:-89.82},
+  {type:"Solar & Wind",location:"Montgomery IL / MO Multi-County",lat:39.16,lng:-89.48},
+  {type:"Solar & Wind",location:"Kankakee/Livingston Co., IL",lat:41.15,lng:-87.86},
+  {type:"Solar",location:"Mercer County, IL",lat:41.20,lng:-90.74},
+  {type:"Solar",location:"Fulton/McDonough Co., IL",lat:40.47,lng:-90.40},
+  {type:"Solar",location:"Scott/Morgan Co., IL",lat:39.64,lng:-90.47},
+  {type:"Solar",location:"Porter/LaPorte Co., IN",lat:41.52,lng:-87.07},
+  {type:"Solar",location:"Vermillion County, IN",lat:39.85,lng:-87.46},
+  {type:"Solar",location:"Clinton/Carroll/Howard Co., IN",lat:40.50,lng:-86.47},
+  {type:"Solar",location:"Livingston/Ingham Co., MI",lat:42.60,lng:-84.07},
+  {type:"Solar",location:"Clinton/Eaton/Ionia Co., MI",lat:42.95,lng:-84.84},
+  {type:"Wind",location:"Cross County, AR",lat:35.29,lng:-90.77},
+  {type:"Wind",location:"Palo Alto County, IA",lat:43.08,lng:-94.68},
+  {type:"Wind",location:"Osage County, KS",lat:38.66,lng:-95.73},
+  {type:"Wind",location:"Osborne County, KS",lat:39.35,lng:-98.77},
+  {type:"Wind",location:"Yuma County, CO",lat:40.00,lng:-102.43},
+  {type:"Wind",location:"Yuma County, CO",lat:39.98,lng:-102.40},
+  {type:"Wind",location:"Benton County, IN",lat:40.60,lng:-87.31},
+  {type:"Wind",location:"Ringgold County, IA",lat:40.73,lng:-94.24},
+  {type:"Wind",location:"Emmet County, IA",lat:43.38,lng:-94.68},
+  {type:"Wind",location:"Whitman County, WA",lat:46.90,lng:-117.52},
+  {type:"Transmission",location:"AZ/NM/CO/NV/UT/OR/ID Multi-State",lat:37.50,lng:-109.50},
+  {type:"Solar",location:"Ottawa County, MI",lat:43.00,lng:-86.18},
+  {type:"Solar",location:"Snowflake, AZ",lat:34.51,lng:-110.08},
+  {type:"Solar",location:"Willcox, AZ",lat:32.25,lng:-109.83},
+  {type:"Solar",location:"Santa Fe County, NM",lat:35.52,lng:-106.04},
+  {type:"Wind",location:"McKean County, PA",lat:41.81,lng:-78.57},
+  {type:"Transmission",location:"Colorado (statewide)",lat:39.00,lng:-105.50},
+  {type:"Transmission",location:"Kansas (statewide)",lat:38.50,lng:-98.00},
+  {type:"Wind/Solar/Hydrogen",location:"Niobrara County, WY",lat:42.97,lng:-104.47},
+  {type:"Wind/Solar/Hydrogen",location:"Converse County, WY",lat:42.97,lng:-105.51},
+  {type:"Solar",location:"Nottoway County, VA",lat:37.14,lng:-78.05},
+  {type:"Solar",location:"Charlotte County, VA",lat:37.01,lng:-78.66},
+  {type:"Solar",location:"Mecklenburg County, VA",lat:36.68,lng:-78.33},
+  {type:"Solar + BESS",location:"Santa Fe County, NM",lat:35.55,lng:-105.98},
+  {type:"Solar + BESS",location:"San Benito County, CA",lat:36.61,lng:-121.08},
+  {type:"Solar",location:"Tulsa County, OK",lat:36.12,lng:-95.94},
+  {type:"BESS",location:"Suffolk County, NY",lat:40.94,lng:-72.68},
+  {type:"Wind",location:"Whiteside County, IL",lat:41.75,lng:-89.91},
+  {type:"Solar",location:"Whiteside/Rock Island Co., IL",lat:41.60,lng:-90.10},
+  {type:"Wind",location:"Hood River/Wasco Co., OR",lat:45.52,lng:-121.18},
+  {type:"Solar, Wind, BESS",location:"Kearny/Finney Co., KS",lat:37.98,lng:-100.86},
+  {type:"Wind + BESS",location:"Garfield/Asotin Co., WA",lat:46.40,lng:-117.20},
+  {type:"Wind",location:"Morton/Oliver Co., ND",lat:46.82,lng:-101.28},
+  {type:"Solar + BESS",location:"Uvalde County, TX",lat:29.36,lng:-99.76},
+  {type:"Data Center",location:"King George County, VA",lat:38.27,lng:-77.16},
+  {type:"Data Center",location:"Fredericksburg, VA",lat:38.30,lng:-77.46},
+];
+
+// SVG icon paths (silhouette style)
+const SVG_ICONS = {
+  Solar: `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
+  Wind: `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L9.5 10H14.5L12 2Z" fill="currentColor"/><path d="M12 10L6.2 17.5L10.2 13.8L12 10Z" fill="currentColor"/><path d="M12 10L17.8 17.5L13.8 13.8L12 10Z" fill="currentColor"/><circle cx="12" cy="10.5" r="1.5" fill="currentColor"/><rect x="11.25" y="12" width="1.5" height="10" rx="0.75" fill="currentColor"/><rect x="8" y="21" width="8" height="1.5" rx="0.75" fill="currentColor"/></svg>`,
+  BESS: `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="14" rx="2" fill="currentColor"/><rect x="9" y="3" width="6" height="3" rx="1" fill="currentColor"/><path d="M13.5 10L11 13.5H13L10.5 17" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+  Transmission: `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 1L8 8H16L12 1Z"/><path d="M9.5 8L7 14H17L14.5 8" /><rect x="11" y="14" width="2" height="8"/><path d="M2 10H8M16 10H22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M4 14H9M15 14H20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>`,
+  'Data Center': `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="2" width="16" height="6" rx="1.5"/><rect x="4" y="10" width="16" height="6" rx="1.5"/><rect x="4" y="18" width="16" height="4" rx="1.5"/><circle cx="7" cy="5" r="1" fill="white"/><circle cx="7" cy="13" r="1" fill="white"/><circle cx="7" cy="20" r="1" fill="white"/><rect x="14" y="4" width="3" height="2" rx="0.5" fill="white"/><rect x="14" y="12" width="3" height="2" rx="0.5" fill="white"/><rect x="14" y="19" width="3" height="2" rx="0.5" fill="white"/></svg>`,
+  Hydrogen: `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="2"/><text x="7" y="11.5" font-size="7" font-weight="bold" font-family="sans-serif" fill="currentColor">H</text><text x="14" y="17" font-size="5" font-weight="bold" font-family="sans-serif" fill="currentColor">2</text></svg>`,
+  Multi: `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="4" fill="currentColor" opacity="0.7"/><circle cx="17" cy="7" r="4" fill="currentColor" opacity="0.7"/><circle cx="12" cy="16" r="4" fill="currentColor" opacity="0.7"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg>`,
+};
+
+// Category config
+const CATEGORIES = {
+  'Solar':        { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  label: 'Solar' },
+  'Wind':         { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)',   label: 'Wind' },
+  'BESS':         { color: '#10B981', bg: 'rgba(16,185,129,0.12)',   label: 'BESS' },
+  'Transmission': { color: '#F97316', bg: 'rgba(249,115,22,0.12)',   label: 'Transmission' },
+  'Data Center':  { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',    label: 'Data Center' },
+  'Hydrogen':     { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)',   label: 'Hydrogen' },
+  'Multi':        { color: '#EC4899', bg: 'rgba(236,72,153,0.12)',   label: 'Multi-Type' },
+};
+
+// Classify each project
+function classifyProject(type) {
+  const t = type.toLowerCase();
+  const cats = [];
+  if (t.includes('solar'))        cats.push('Solar');
+  if (t.includes('wind'))         cats.push('Wind');
+  if (t.includes('bess'))         cats.push('BESS');
+  if (t.includes('transmission')) cats.push('Transmission');
+  if (t.includes('data center'))  cats.push('Data Center');
+  if (t.includes('hydrogen'))     cats.push('Hydrogen');
+  return cats.length === 0 ? ['Solar'] : cats;
+}
+
+function getPrimaryCategory(cats) {
+  if (cats.length > 1) return 'Multi';
+  return cats[0];
+}
+
+// Count states
+const states = new Set();
+PROJECTS.forEach(p => {
+  const loc = p.location;
+  const stateMatch = loc.match(/,\s*([A-Z]{2})(?:\s|$|\))/);
+  if (stateMatch) states.add(stateMatch[1]);
+  // Also parse state names
+  const stateNames = ['VA','PA','LA','WI','AZ','IL','IN','MI','AR','IA','KS','CO','WA','NM','WY','CA','OK','NY','OR','ND','TX','MO'];
+  stateNames.forEach(s => { if (loc.includes(s)) states.add(s); });
+});
+document.getElementById('stateCount').textContent = states.size + ' states';
+
+// Count by category
+const catCounts = {};
+PROJECTS.forEach(p => {
+  const cats = classifyProject(p.type);
+  cats.forEach(c => { catCounts[c] = (catCounts[c] || 0) + 1; });
+  if (cats.length > 1) catCounts['Multi'] = (catCounts['Multi'] || 0) + 1;
+});
+
+// Init map
+const map = L.map('map', {
+  center: [39.0, -96.0],
+  zoom: 5,
+  zoomControl: false,
+  attributionControl: true,
+});
+
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+  crossOrigin: true
+}).addTo(map);
+
+// Remove any leftover tile filters
+document.querySelector('.leaflet-tile-pane').style.filter = 'none';
+
+// Create markers
+const allMarkers = [];
+
+PROJECTS.forEach((p, i) => {
+  const cats = classifyProject(p.type);
+  const primary = getPrimaryCategory(cats);
+  const cfg = CATEGORIES[primary];
+
+  const size = 30;
+  const svgIcon = SVG_ICONS[primary] || SVG_ICONS['Multi'];
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="custom-marker" style="
+      width:${size}px; height:${size}px;
+      background: white;
+      border: 2.5px solid ${cfg.color};
+      color: ${cfg.color};
+    "><div style="width:${size * 0.58}px; height:${size * 0.58}px; display:flex; align-items:center; justify-content:center;">${svgIcon}</div></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -size/2 - 4],
+  });
+
+  const marker = L.marker([p.lat, p.lng], { icon });
+
+  // Build popup
+  const catBadges = cats.map(c => {
+    const cc = CATEGORIES[c];
+    const svgSmall = SVG_ICONS[c] || SVG_ICONS['Multi'];
+    return `<span class="popup-type" style="background:${cc.bg}; color:${cc.color}"><span style="width:13px;height:13px;display:inline-flex;">${svgSmall}</span> ${cc.label}</span>`;
+  }).join(' ');
+
+  marker.bindPopup(`
+    <div class="popup-inner">
+      <div style="margin-bottom:8px">${catBadges}</div>
+      <div class="popup-location">${p.location}</div>
+    </div>
+  `, { maxWidth: 280 });
+
+  marker.projectCats = cats;
+  marker.projectPrimary = primary;
+  marker.addTo(map);
+  allMarkers.push(marker);
+});
+
+// Build filter buttons
+const filterState = {};
+const filtersEl = document.getElementById('filters');
+
+Object.entries(CATEGORIES).forEach(([key, cfg]) => {
+  const count = catCounts[key] || 0;
+  if (count === 0) return;
+
+  filterState[key] = true;
+
+  const btn = document.createElement('button');
+  btn.className = 'filter-btn active';
+  btn.style.setProperty('--active-bg', cfg.bg);
+  btn.innerHTML = `
+    <span class="filter-icon" style="background:${cfg.bg}; color:${cfg.color}"><span style="width:16px;height:16px;display:flex;">${SVG_ICONS[key] || SVG_ICONS['Multi']}</span></span>
+    <span class="filter-label">${cfg.label}</span>
+    <span class="filter-count">${count}</span>
+  `;
+
+  btn.addEventListener('click', () => {
+    filterState[key] = !filterState[key];
+    btn.className = filterState[key] ? 'filter-btn active' : 'filter-btn inactive';
+    btn.style.background = filterState[key] ? cfg.bg : 'transparent';
+    updateMarkers();
+  });
+
+  btn.style.background = cfg.bg;
+  filtersEl.appendChild(btn);
+});
+
+function updateMarkers() {
+  let visible = 0;
+  allMarkers.forEach(marker => {
+    // Show if any of the marker's categories is active
+    const shouldShow = marker.projectCats.some(c => filterState[c]) ||
+                       (marker.projectCats.length > 1 && filterState['Multi']);
+    if (shouldShow) {
+      marker.addTo(map);
+      visible++;
+    } else {
+      map.removeLayer(marker);
+    }
+  });
+  document.getElementById('totalCount').textContent = visible;
+}
+</script>
+</body>
+</html>
