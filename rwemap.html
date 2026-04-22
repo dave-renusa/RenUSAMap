@@ -193,6 +193,18 @@
   .popup-name { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
   .popup-location { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
 
+  .state-tooltip {
+    background: rgba(255,255,255,0.9);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
   .leaflet-control-attribution {
     background: rgba(255,255,255,0.85) !important;
     color: var(--text-muted) !important;
@@ -409,6 +421,34 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   maxZoom: 19,
 }).addTo(map);
+
+// ── State shading ─────────────────────────────────────────────────────────
+const SHADED_STATES = new Set([
+  'Indiana','Illinois','Michigan','Iowa','Nebraska',
+  'Wisconsin','Minnesota','South Dakota','Missouri'
+]);
+
+fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json')
+  .then(r => r.json())
+  .then(data => {
+    L.geoJSON(data, {
+      filter: f => SHADED_STATES.has(f.properties.name),
+      style: {
+        fillColor:   '#00A19F',
+        fillOpacity: 0.13,
+        color:       '#00A19F',
+        weight:      1.5,
+        opacity:     0.40,
+      },
+      onEachFeature: (feature, layer) => {
+        layer.bindTooltip(feature.properties.name, {
+          permanent: false, sticky: true,
+          className: 'state-tooltip',
+          direction: 'center',
+        });
+      }
+    }).addTo(map);
+  });
 
 // ── Filter state ──────────────────────────────────────────────────────────
 const filterState = {
