@@ -13,8 +13,8 @@
   :root {
     --rwe:       #00A19F;
     --rwe-bg:    rgba(0,161,159,0.10);
-    --other:     #E9C7E2;
-    --other-bg:  rgba(233,199,226,0.20);
+    --other:     #F59E0B;
+    --other-bg:  rgba(245,158,11,0.12);
     --panel-bg:  #ffffff;
     --panel-border: rgba(0,0,0,0.08);
     --text-primary:   #1a1d27;
@@ -34,6 +34,7 @@
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     z-index: 1;
+    background: #8FB4C0;
   }
 
   .leaflet-control-zoom { display: none; }
@@ -252,7 +253,7 @@
       <span class="dev-count" id="rwe-count">—</span>
     </div>
     <div class="dev-chip other-chip" id="chip-other" onclick="toggleDev('Other')">
-      <div class="dev-dot" style="background:#D4A8CC"></div>
+      <div class="dev-dot" style="background:#F59E0B"></div>
       <span>Other</span>
       <span class="dev-count" id="other-count">—</span>
     </div>
@@ -268,11 +269,15 @@
 // ── Colors ──────────────────────────────────────────────────────────────
 const DEV_COLOR = {
   RWE:   '#00A19F',
-  Other: '#E9C7E2',
+  Other: '#F59E0B',
 };
 const DEV_SHADOW = {
   RWE:   'rgba(0,161,159,0.35)',
-  Other: 'rgba(200,150,195,0.35)',
+  Other: 'rgba(245,158,11,0.35)',
+};
+const DEV_SIZE = {
+  RWE:   36,
+  Other: 18,
 };
 
 // ── SVG Icons (24×24 viewBox, white fill) ───────────────────────────────
@@ -417,28 +422,38 @@ const map = L.map('map', {
   attributionControl: true,
 });
 
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  maxZoom: 19,
-}).addTo(map);
-
-// ── State shading ─────────────────────────────────────────────────────────
+// ── State layers (no tiles — GeoJSON-only base map) ───────────────────────
 const SHADED_STATES = new Set([
   'Indiana','Illinois','Michigan','Iowa','Nebraska',
   'Wisconsin','Minnesota','South Dakota','Missouri'
 ]);
 
+const SKIP_STATES = new Set(['Alaska','Hawaii','Puerto Rico']);
+
 fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json')
   .then(r => r.json())
   .then(data => {
+    // Layer 1: All continental states — solid base color
+    L.geoJSON(data, {
+      filter: f => !SKIP_STATES.has(f.properties.name),
+      style: f => ({
+        fillColor:   '#D4DAE1',
+        fillOpacity: 1.0,
+        color:       '#FFFFFF',
+        weight:      0.9,
+        opacity:     1.0,
+      }),
+    }).addTo(map);
+
+    // Layer 2: Key states — teal overlay on top
     L.geoJSON(data, {
       filter: f => SHADED_STATES.has(f.properties.name),
       style: {
         fillColor:   '#00A19F',
-        fillOpacity: 0.13,
+        fillOpacity: 0.30,
         color:       '#00A19F',
         weight:      1.5,
-        opacity:     0.40,
+        opacity:     0.65,
       },
       onEachFeature: (feature, layer) => {
         layer.bindTooltip(feature.properties.name, {
@@ -457,14 +472,13 @@ const filterState = {
 };
 
 // ── Markers ───────────────────────────────────────────────────────────────
-const SIZE = 36;
 const allMarkers = [];
 
 PROJECTS.forEach(p => {
   const color  = DEV_COLOR[p.developer];
   const shadow = DEV_SHADOW[p.developer];
+  const SIZE   = DEV_SIZE[p.developer];
   const svgRaw = ICONS[p.type] || ICONS.Solar;
-  // Replace fill="white" with actual white; fill="currentColor" → color
   const svgHtml = svgRaw.replace(/fill="currentColor"/g, `fill="${color}"`);
 
   const icon = L.divIcon({
@@ -472,7 +486,7 @@ PROJECTS.forEach(p => {
     html: `<div class="map-marker" style="
       width:${SIZE}px; height:${SIZE}px;
       background:${color};
-      box-shadow: 0 3px 12px ${shadow}, 0 0 0 2.5px white;
+      box-shadow: 0 3px 10px ${shadow}, 0 0 0 2px white;
     ">
       <div style="width:${Math.round(SIZE*0.58)}px; height:${Math.round(SIZE*0.58)}px; display:flex; align-items:center; justify-content:center;">
         ${svgHtml}
